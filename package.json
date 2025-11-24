@@ -7,6 +7,7 @@
   "dependencies": {
     "@stripe/react-stripe-js": "^1.7.0",
     "@stripe/stripe-js": "^1.23.0",
+    "@types/three": "^0.181.0",
     "airtable": "^0.11.2",
     "lodash": "^4.17.21",
     "material-icons": "^1.10.7",
@@ -21,7 +22,8 @@
     "react-smooth-scrollbar": "^7.2.2",
     "stripe": "^8.205.0",
     "tachyons": "^4.7.1",
-    "three": "^0.85.2",
+    "three": "^0.181.2",
+    "three-stdlib": "^2.36.1",
     "tween.js": "^16.6.0"
   },
   "devDependencies": {

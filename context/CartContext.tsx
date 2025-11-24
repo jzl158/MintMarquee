@@ -2,12 +2,23 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 
+import type { Product, MaterialType } from "../types/product";
+
+type CartItemCustomization = {
+  material?: MaterialType;
+  uploadedFile?: File;
+  customNotes?: string;
+};
+
 type CartItem = {
+  id: string;
   price: number;
   name: string;
   description: string;
   quantity: number;
   url: string;
+  product?: Product;
+  customizations?: CartItemCustomization;
 }
 
 const CartContext = React.createContext<{
@@ -57,22 +68,38 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  function addToCart(details) {
+  function addToCart(details, customizations = null) {
     if (status === "unauthenticated") {
       return router.push('/login')
     }
 
-    const cartItem = cartItems.find(({ id }) => id === details.id);
+    // For custom orders or items with specific customizations, always add as new item
+    // Otherwise, increment quantity of existing item
+    const shouldAddAsNewItem = customizations?.uploadedFile || customizations?.customNotes;
+
+    const cartItem = shouldAddAsNewItem ? null : cartItems.find(({ id }) => id === details.id);
 
     if (!cartItem) {
+      const newItem = {
+        ...details,
+        quantity: customizations?.quantity || 1,
+        customizations: customizations ? {
+          material: customizations.material,
+          customNotes: customizations.customNotes,
+          // Note: File objects can't be serialized to localStorage
+          // In production, upload file to server first and store URL
+          uploadedFileName: customizations.uploadedFile?.name,
+        } : undefined
+      };
+
       setCartItems([
         ...cartItems,
-        { ...details, quantity: 1 },
+        newItem,
       ])
     } else {
       setCartItems([
         ...cartItems.filter(item => item.id !== cartItem.id),
-        { ...cartItem, quantity: cartItem.quantity += 1 },
+        { ...cartItem, quantity: cartItem.quantity += (customizations?.quantity || 1) },
       ])
     }
 

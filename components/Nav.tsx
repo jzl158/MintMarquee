@@ -57,19 +57,27 @@ export default function Nav() {
   return (
     <div className={`fixed w-100 ph3 pv3 pv3-ns ph3-m ph4-l fixed z-9999`}>
       <header>
-        <nav className="f6 fw6 ttu tracked dt-l w-100 mw8 center">
-          <div className="w-100 w-10-l dtc-l tc tl-l v-mid">
+        <nav className="f6 fw6 ttu tracked dt-l w-100 center">
+          <div className="w-100 w-30-l dtc-l tc tl-l v-mid">
             <Link href="/">
-              <a className="link dim white dib mr3" title="Home">
-                V R S
+              <a className="link dim dib" title="Home">
+                <Image
+                  src="/images/MMweblogo.png"
+                  alt="MintMarquee Logo"
+                  width={225}
+                  height={75}
+                  objectFit="contain"
+                  priority
+                />
               </a>
             </Link>
           </div>
-          <div className="w-100 w-90-l dtc-l tc tr-l v-mid">
+          <div className="w-100 w-70-l dtc-l tc tr-l v-mid">
             <Link href="/store">
               <a
-                className={`link dim white dib mr3 v-mid ${router.pathname === "/store" ? "bb" : ""
+                className={`link dim dib mr3 v-mid ${router.pathname === "/store" ? "bb" : ""
                   }`}
+                style={{ color: '#01693e' }}
                 title="Store"
               >
                 Store
@@ -77,15 +85,17 @@ export default function Nav() {
             </Link>
             <Link href="/about">
               <a
-                className={`link dim white dib mr3 v-mid ${router.pathname === "/about" ? "bb" : ""
+                className={`link dim dib mr3 v-mid ${router.pathname === "/about" ? "bb" : ""
                   }`}
+                style={{ color: '#01693e' }}
                 title="About"
               >
                 About
               </a>
             </Link>
             <a
-              className="link dim white dib mr3 v-mid"
+              className="link dim dib mr3 v-mid"
+              style={{ color: '#01693e' }}
               href="https://github.com/vercel/vrs"
               target="_blank"
               title="GitHub"
@@ -93,7 +103,8 @@ export default function Nav() {
               GitHub
             </a>
             <a
-              className="link dim white dib mr3 v-mid"
+              className="link dim dib mr3 v-mid"
+              style={{ color: '#01693e' }}
               href="#"
               onClick={e => {
                 e.preventDefault();
@@ -103,11 +114,11 @@ export default function Nav() {
               title="Open Cart"
             >
               <Cart>
-                <i className="material-icons md-18">shopping_cart</i>
+                <i className="material-icons md-18" style={{ color: '#01693e' }}>shopping_cart</i>
               </Cart>
             </a>
             {avatarURL ? (
-              <div className="link dim white dib v-mid">
+              <div className="link dim dib v-mid">
                 <Image
                   onClick={logout}
                   height={20}
@@ -118,11 +129,12 @@ export default function Nav() {
             ) : (
               <Link href="/login">
                 <a
-                  className={`link dim white dib v-mid ${router.pathname === "/login" ? "bb" : ""
+                  className={`link dim dib v-mid ${router.pathname === "/login" ? "bb" : ""
                     }`}
+                  style={{ color: '#01693e' }}
                   title="Login"
                 >
-                  <i className="material-icons md-18">person</i>
+                  <i className="material-icons md-18" style={{ color: '#01693e' }}>person</i>
                 </a>
               </Link>
             )}

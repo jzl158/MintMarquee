@@ -3,7 +3,7 @@
  */
 
 import { Component } from 'react'
-import { THREE } from "../utils/three";
+import { THREE, EffectComposer } from "../utils/three";
 
 export default class ShowBox extends Component<{
   width: number;
@@ -50,7 +50,7 @@ export default class ShowBox extends Component<{
     this.scene.add(this.object)
 
     let geometry = new THREE.SphereGeometry(3, 4, 4)
-    let material = new THREE.MeshPhongMaterial({ color: 0xeeeeee, shading: THREE.FlatShading })
+    let material = new THREE.MeshPhongMaterial({ color: 0xeeeeee, flatShading: true })
 
     let mesh = new THREE.Mesh(geometry, material)
     mesh.position.set(0, 0, 0)
@@ -66,7 +66,7 @@ export default class ShowBox extends Component<{
     this.scene.add(light)
 
     // postprocessing
-    this.composer = new THREE.EffectComposer(this.renderer)
+    this.composer = new EffectComposer(this.renderer)
     this.props.composer && this.props.composer.call(this)
   }
   tick() {

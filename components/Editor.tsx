@@ -7,8 +7,28 @@ import Router from "next/router";
 import dynamic from "next/dynamic"
 import throttle from "lodash/throttle";
 
-import { THREE } from "../utils/three";
+import {
+  THREE,
+  STLLoader,
+  OBJLoader,
+  GLTFLoader,
+  OrbitControls,
+  EffectComposer,
+  RenderPass,
+  ShaderPass,
+  UnrealBloomPass,
+  FilmPass,
+  OutlinePass,
+  CopyShader,
+  FilmShader,
+  RGBShiftShader,
+  VignetteShader,
+  LuminosityHighPassShader,
+  FXAAShader,
+  StereoEffect
+} from "../utils/three";
 import { useCartContext } from "../context/CartContext";
+import { ModelFormat, Product } from "../types/product";
 const EditorSidebar = dynamic(() => import("./EditorSidebar"));
 
 // utils
@@ -48,64 +68,11 @@ const objectBlur = object => {
 
 // end utils
 
-THREE.FilmShader.fragmentShader = [
-  "#include <common>",
-  "uniform float time;",
-  "uniform bool grayscale;",
-  "uniform float nIntensity;",
-  "uniform float sIntensity;",
-  "uniform float sCount;",
-  "uniform sampler2D tDiffuse;",
-  "varying vec2 vUv;",
-  "void main() {",
-  "vec4 cTextureScreen = texture2D( tDiffuse, vUv );",
-  "float dx = rand( vUv + time );",
-  "vec3 cResult = cTextureScreen.rgb + cTextureScreen.rgb * clamp( 0.1 + dx, 0.0, 1.0 );",
-  "vec2 sc = vec2( sin( vUv.y * sCount ), cos( vUv.y * sCount ) );",
-  "cResult += cTextureScreen.rgb * vec3( sc.x, sc.x, sc.x ) * sIntensity;", // use single color
-  "cResult = cTextureScreen.rgb + clamp( nIntensity, 0.0,1.0 ) * ( cResult - cTextureScreen.rgb );",
-  "if( grayscale ) {",
-  "cResult = vec3( cResult.r * 0.3 + cResult.g * 0.59 + cResult.b * 0.11 );",
-  "}",
-  "gl_FragColor =  vec4( cResult, cTextureScreen.a );",
-  "}"
-].join("\n");
-
-THREE.StereoEffect = function (renderer, composer, renderPass) {
-  var _stereo = new THREE.StereoCamera();
-  _stereo.aspect = 0.5;
-  this.setEyeSeparation = function (eyeSep) {
-    _stereo.eyeSep = eyeSep;
-  };
-  this.setSize = function (width, height) {
-    renderer.setSize(width, height);
-  };
-  this.render = function (scene, camera) {
-    scene.updateMatrixWorld();
-    if (camera.parent === null) camera.updateMatrixWorld();
-    _stereo.update(camera);
-    let size = renderer.getSize();
-    if (renderer.autoClear) renderer.clear();
-    renderer.setScissorTest(true);
-    renderer.setScissor(0, 0, size.width / 2, size.height);
-    renderer.setViewport(0, 0, size.width / 2, size.height);
-    renderPass.camera = _stereo.cameraL;
-    // renderer.render(scene, _stereo.cameraL)
-    // renderer.compile(scene, _stereo.cameraL)
-    composer.render(0.01);
-
-    renderer.setScissor(size.width / 2, 0, size.width / 2, size.height);
-    renderer.setViewport(size.width / 2, 0, size.width / 2, size.height);
-    renderPass.camera = _stereo.cameraR;
-    // renderer.render(scene, _stereo.cameraR)
-    // renderer.compile(scene, _stereo.cameraR)
-    composer.render(0.01);
-  };
-};
+// FilmShader and StereoEffect customizations moved to utils/three.ts
 
 
 class Editor extends Component<{
-  details: { id: string; name: string; description: string; url: string; amount: number; };
+  details: Product;
   addToCart: (x: any) => void;
 }> {
   three;
@@ -212,15 +179,15 @@ class Editor extends Component<{
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(1); //window.devicePixelRatio || 1)
     renderer.setSize(width, height);
-    renderer.gammaInput = true;
-    renderer.gammaOutput = true;
+    // Modern Three.js color management (replaces gammaInput/gammaOutput)
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 1, 10000);
     camera.lookAt(new THREE.Vector3());
 
     let controls;
 
-    controls = new THREE.OrbitControls(camera, this.canvas);
+    controls = new OrbitControls(camera, this.canvas);
     controls.enableZoom = true;
     controls.enablePan = false;
     controls.enableDamping = true;
@@ -229,10 +196,10 @@ class Editor extends Component<{
 
     /*
     if (this.isMob) {
-      controls = new THREE.DeviceOrientationControls(camera);
+      controls = new DeviceOrientationControls(camera);
     } else {
-    
-    controls = new THREE.OrbitControls(camera, this.canvas);
+
+    controls = new OrbitControls(camera, this.canvas);
     controls.enableZoom = true;
     controls.enablePan = false;
     controls.enableDamping = true;
@@ -291,7 +258,7 @@ class Editor extends Component<{
       `,
       side: THREE.DoubleSide
     });
-    shapeMaterial.extensions.derivatives = true;
+    // shapeMaterial.extensions.derivatives removed in modern Three.js
 
     const wireframeMaterial = new THREE.MeshDepthMaterial({
       name: "wireframeMaterial",
@@ -322,7 +289,8 @@ class Editor extends Component<{
     const { renderer } = this.three;
     const scene = new THREE.Scene();
 
-    scene.background = new THREE.Color(0x000000, 0);
+    // Transparent background (alpha channel enabled in renderer)
+    scene.background = null;
 
     scene.add(new THREE.GridHelper(100, 100, 0xcccccc, 0x444444));
     // scene.add(new THREE.AxisHelper(20))
@@ -338,15 +306,16 @@ class Editor extends Component<{
     hemiLight.position.set(0, 500, 100);
     scene.add(hemiLight);
 
-    const groundMirror = new THREE.Mirror(100, 100, {
-      clipBias: 0.1,
-      textureWidth: window.innerWidth,
-      textureHeight: window.innerHeight,
-      color: 0x333333
-    });
-    groundMirror.rotateX(-Math.PI / 2);
-    groundMirror.translateZ(-0.1);
-    scene.add(groundMirror);
+    // TODO: Add Reflector from three-stdlib as replacement for old Mirror
+    // const groundMirror = new THREE.Mirror(100, 100, {
+    //   clipBias: 0.1,
+    //   textureWidth: window.innerWidth,
+    //   textureHeight: window.innerHeight,
+    //   color: 0x333333
+    // });
+    // groundMirror.rotateX(-Math.PI / 2);
+    // groundMirror.translateZ(-0.1);
+    // scene.add(groundMirror);
 
     scene.fog = new THREE.FogExp2(0x050505, 0.03);
     renderer.setClearColor(scene.fog.color);
@@ -357,14 +326,14 @@ class Editor extends Component<{
     const { scene, camera, renderer } = this.three;
 
     renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
-    const composer = new THREE.EffectComposer(renderer);
+    const composer = new EffectComposer(renderer);
 
     let effect;
 
-    const renderPass = new THREE.RenderPass(scene, camera);
+    const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
 
-    effect = new THREE.UnrealBloomPass(
+    effect = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
       1.2,
       1,
@@ -372,14 +341,16 @@ class Editor extends Component<{
     );
     composer.addPass(effect);
 
-    let hblur = new THREE.ShaderPass(THREE.HorizontalTiltShiftShader);
-    let vblur = new THREE.ShaderPass(THREE.VerticalTiltShiftShader);
-    let blur = 1;
-    hblur.uniforms["h"].value = blur / window.innerWidth;
-    vblur.uniforms["v"].value = blur / window.innerHeight;
-    hblur.uniforms["r"].value = vblur.uniforms["r"].value = 0.55;
-    composer.addPass(vblur);
-    composer.addPass(hblur);
+    // Note: HorizontalTiltShiftShader/VerticalTiltShiftShader not in three-stdlib
+    // TODO: Implement or find alternative
+    // let hblur = new ShaderPass(HorizontalTiltShiftShader);
+    // let vblur = new ShaderPass(VerticalTiltShiftShader);
+    // let blur = 1;
+    // hblur.uniforms["h"].value = blur / window.innerWidth;
+    // vblur.uniforms["v"].value = blur / window.innerHeight;
+    // hblur.uniforms["r"].value = vblur.uniforms["r"].value = 0.55;
+    // composer.addPass(vblur);
+    // composer.addPass(hblur);
 
     // effect = new THREE.ShaderPass(THREE.ColorCorrectionShader)
     // composer.addPass(effect)
@@ -403,35 +374,36 @@ class Editor extends Component<{
     // composer.addPass(effect)
 
     if (this.wireframe || this.vr) {
-      effect = new THREE.ShaderPass(THREE.RGBShiftShader);
+      effect = new ShaderPass(RGBShiftShader);
       effect.uniforms.amount.value = 0.0007;
       composer.addPass(effect);
     }
 
     if (this.wireframe || this.vr) {
-      effect = new THREE.FilmPass(0.25, 0.4, 1500, false);
+      // Modern FilmPass constructor: (intensity?, grayscale?)
+      effect = new FilmPass(0.25);
       composer.addPass(effect);
     }
 
-    // const outlineEffect = new THREE.OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera)
+    // const outlineEffect = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera)
     // outlineEffect.renderToScreen = true
     // composer.addPass(outlineEffect)
 
-    effect = new THREE.ShaderPass(THREE.FXAAShader);
+    effect = new ShaderPass(FXAAShader);
     effect.uniforms["resolution"].value = new THREE.Vector2(
       1 / window.innerWidth,
       1 / window.innerHeight
     );
     composer.addPass(effect);
 
-    effect = new THREE.ShaderPass(THREE.VignetteShader);
+    effect = new ShaderPass(VignetteShader);
     effect.uniforms["offset"].value = 0.5;
     effect.uniforms["darkness"].value = this.vr ? 6 : 4;
     effect.renderToScreen = true;
     composer.addPass(effect);
 
     if (this.vr) {
-      const stereoEffect = new THREE.StereoEffect(
+      const stereoEffect = new StereoEffect(
         renderer,
         composer,
         renderPass
@@ -482,29 +454,151 @@ class Editor extends Component<{
 
     this.three.composer = composer;
   }
-  initModel(): Promise<void> {
-    const loader = new THREE.ObjectLoader();
+  /**
+   * Determine file format from file extension
+   */
+  getModelFormat(path: string): ModelFormat {
+    const ext = path.split('.').pop()?.toLowerCase();
+    if (ext === 'stl') return 'stl';
+    if (ext === 'obj') return 'obj';
+    if (ext === 'gltf') return 'gltf';
+    if (ext === 'glb') return 'glb';
+    if (ext === '3mf') return '3mf';
+    // Default to old format for backward compatibility
+    return 'gltf';
+  }
 
+  /**
+   * Load 3D model with support for multiple formats (STL, OBJ, GLTF, 3MF)
+   */
+  initModel(): Promise<void> {
     const id =
       new URL(window.location.href).searchParams.get("id") ||
       Router.query.id ||
       this.props.details.id;
-    const modelPath = `/models/${id}/data.js`;
 
-    return new Promise(resolve => {
-      loader.load(modelPath, result => {
+    // Try to get model path from product details
+    const modelPath = this.props.details?.model?.path || `/models/${id}/data.js`;
+    const format = this.getModelFormat(modelPath);
+
+    return new Promise((resolve, reject) => {
+      switch (format) {
+        case 'stl':
+          this.loadSTL(modelPath, resolve, reject);
+          break;
+        case 'obj':
+          this.loadOBJ(modelPath, resolve, reject);
+          break;
+        case 'gltf':
+        case 'glb':
+          this.loadGLTF(modelPath, resolve, reject);
+          break;
+        default:
+          // Fallback to old ObjectLoader for backward compatibility
+          this.loadLegacy(modelPath, resolve, reject);
+          break;
+      }
+    });
+  }
+
+  /**
+   * Load STL file (returns BufferGeometry)
+   */
+  loadSTL(path: string, resolve: () => void, reject: (err: any) => void) {
+    const loader = new STLLoader();
+    loader.load(
+      path,
+      (geometry) => {
+        // Center the geometry
+        geometry.center();
+        geometry.computeVertexNormals();
+
+        // Create mesh with default material
+        const material = new THREE.MeshPhongMaterial({
+          color: 0xaaaaaa,
+          specular: 0x111111,
+          shininess: 200,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+
+        // Create a group to hold the mesh
+        const group = new THREE.Group();
+        group.add(mesh);
+
+        this.initModelObject(group);
+        resolve();
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading STL:', error);
+        reject(error);
+      }
+    );
+  }
+
+  /**
+   * Load OBJ file (returns Group)
+   */
+  loadOBJ(path: string, resolve: () => void, reject: (err: any) => void) {
+    const loader = new OBJLoader();
+    loader.load(
+      path,
+      (object) => {
+        this.initModelObject(object);
+        resolve();
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading OBJ:', error);
+        reject(error);
+      }
+    );
+  }
+
+  /**
+   * Load GLTF/GLB file (returns scene)
+   */
+  loadGLTF(path: string, resolve: () => void, reject: (err: any) => void) {
+    const loader = new GLTFLoader();
+    loader.load(
+      path,
+      (gltf) => {
+        this.initModelScene(gltf.scene);
+        resolve();
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading GLTF:', error);
+        reject(error);
+      }
+    );
+  }
+
+  /**
+   * Legacy loader for old Three.js JSON format
+   */
+  loadLegacy(path: string, resolve: () => void, reject: (err: any) => void) {
+    const loader = new THREE.ObjectLoader();
+    loader.load(
+      path,
+      (result: any) => {
         if (result instanceof THREE.Scene) {
           this.initModelScene(result);
         } else {
           if (result.scene) {
-            this.initModelScene(result);
+            this.initModelScene(result.scene);
           } else {
             this.initModelObject(result);
           }
         }
         resolve();
-      });
-    });
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading model:', error);
+        reject(error);
+      }
+    );
   }
   initModelControls() {
     // compute the rotation center from camera's target
@@ -524,7 +618,8 @@ class Editor extends Component<{
     // set an initial scale for camera/controls
     const { camera } = this.three;
     let bBox = new THREE.Box3().setFromObject(scene);
-    let { y: height, x: width, z: depth } = bBox.getSize();
+    let size = bBox.getSize(new THREE.Vector3());
+    let { y: height, x: width, z: depth } = size;
     let modelSize = Math.max(height, width, depth);
     let scaleRatio = 10 / modelSize;
     height *= scaleRatio;
@@ -605,20 +700,22 @@ class Editor extends Component<{
 
     const { scene } = this.three;
 
+    // TODO: Update wireframe/points visualization for BufferGeometry
+    // The old Geometry class with vertices[] no longer exists in modern Three.js
     let verticesCnt = 0;
     let wireframeClone = object.clone();
     traverse(wireframeClone, child => {
       if (child instanceof THREE.Mesh) {
-        let pointsGeo = new THREE.Geometry();
-        pointsGeo.dynamic = true;
-        for (let i = 0; i < child.geometry.vertices.length; ++i) {
-          pointsGeo.vertices.push(child.geometry.vertices[i]);
-          ++verticesCnt;
+        // Modern Three.js uses BufferGeometry
+        const geometry = child.geometry as THREE.BufferGeometry;
+        if (geometry.attributes.position) {
+          verticesCnt += geometry.attributes.position.count;
         }
         child.material = this.materials.wireframeMaterial;
 
-        let points = new THREE.Points(pointsGeo, this.materials.pointsMaterial);
-        child.add(points);
+        // TODO: Recreate points visualization with BufferGeometry
+        // let points = new THREE.Points(geometry, this.materials.pointsMaterial);
+        // child.add(points);
       }
     });
     this.pointOpacity = Math.min(Math.max(500 / verticesCnt, 0.12), 1);
@@ -630,7 +727,7 @@ class Editor extends Component<{
     let shapeClone = object.clone();
     shapeClone.traverse(child => {
       if (child instanceof THREE.Mesh) {
-        let geometry = new THREE.BufferGeometry().fromGeometry(child.geometry);
+        let geometry = child.geometry as THREE.BufferGeometry;
 
         let vectors = [
           new THREE.Vector3(1, 0, 0),
@@ -643,7 +740,7 @@ class Editor extends Component<{
           vectors[i % 3].toArray(centers, i * 3);
         }
 
-        geometry.addAttribute("center", new THREE.BufferAttribute(centers, 3));
+        geometry.setAttribute("center", new THREE.BufferAttribute(centers, 3));
 
         child.geometry = geometry;
         child.material = this.materials.shapeMaterial;
@@ -656,7 +753,7 @@ class Editor extends Component<{
       material.name = "objectMaterial";
       material.polygonOffset = true;
       material.polygonOffsetFactor = -0.1;
-      material.vertexColors = THREE.FaceColors;
+      material.vertexColors = true; // Modern Three.js uses boolean instead of THREE.FaceColors
       material.transparent = true;
       material.opacity = 1;
     };

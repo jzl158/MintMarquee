@@ -1,10 +1,11 @@
 import { Component } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Motion, spring } from "react-motion";
 
 import ShowBox from "./ShowBox";
 import Footer from "./Footer";
-import { THREE } from "../utils/three";
+import { THREE, RenderPass, ShaderPass, RGBShiftShader } from "../utils/three";
 
 const Page = ({ children, fixed }: { children: JSX.Element | JSX.Element[]; fixed?: boolean }) => (
   <div className={`slider-item ${fixed ? "fixed" : "relative slide"}`}>
@@ -56,18 +57,25 @@ class Slider extends Component<{}, {
                     style={{ y: spring(0), o: spring(1) }}
                   >
                     {style => (
-                      <h2
-                        className="f1 fw6 tc ttu f-subheadline-l mt0 mb3"
+                      <div
+                        className="flex justify-center mb3"
                         style={{
                           transform: `translateY(${style.y}px)`,
                           opacity: style.o
                         }}
                       >
-                        V R S
-                      </h2>
+                        <Image
+                          src="/images/MMWHTfull.PNG"
+                          alt="MintMarquee"
+                          width={500}
+                          height={167}
+                          objectFit="contain"
+                          priority
+                        />
+                      </div>
                     )}
                   </Motion>
-                  <p className="i f5 tracked-mega-l">virtual reality store</p>
+                  <p className="i f5 tracked-mega-l">Creative Direction and 3D Printing Agency</p>
                   <div className="ttu mt3 f4">
                     <Link href="/store">
                       <a className="dib ph2 pv1 fw6 white tracked-mega no-underline">
@@ -112,7 +120,7 @@ class Slider extends Component<{}, {
                     width={Math.min(600, width)}
                     height={Math.min(600, height * 0.6)}
                     composer={function () {
-                      let effect = new THREE.RenderPass(
+                      let effect = new RenderPass(
                         this.scene,
                         this.camera
                       );
@@ -135,19 +143,20 @@ class Slider extends Component<{}, {
                     width={Math.min(600, width)}
                     height={Math.min(600, height * 0.6)}
                     composer={function () {
-                      let effect = new THREE.RenderPass(
+                      let effect = new RenderPass(
                         this.scene,
                         this.camera
                       );
-                      // effect.renderToScreen = true
+                      effect.renderToScreen = true;
                       this.composer.addPass(effect);
 
-                      effect = new THREE.ShaderPass(THREE.EdgeShader2);
-                      effect.uniforms.aspect.value = new THREE.Vector2(
-                        500,
-                        500
-                      );
-                      effect.renderToScreen = true;
+                      // TODO: EdgeShader2 not available in three-stdlib
+                      // effect = new ShaderPass(EdgeShader2);
+                      // effect.uniforms.aspect.value = new THREE.Vector2(
+                      //   500,
+                      //   500
+                      // );
+                      // effect.renderToScreen = true;
                       this.composer.addPass(effect);
                     }}
                   />
@@ -217,17 +226,16 @@ class Slider extends Component<{}, {
                     width={Math.min(600, width)}
                     height={Math.min(600, height * 0.6)}
                     composer={function () {
-                      let effect = new THREE.RenderPass(
+                      let renderPass = new RenderPass(
                         this.scene,
                         this.camera
                       );
-                      // effect.renderToScreen = true
-                      this.composer.addPass(effect);
+                      this.composer.addPass(renderPass);
 
-                      effect = new THREE.ShaderPass(THREE.RGBShiftShader);
-                      effect.uniforms.amount.value = 0.03;
-                      effect.renderToScreen = true;
-                      this.composer.addPass(effect);
+                      let shaderPass = new ShaderPass(RGBShiftShader);
+                      shaderPass.uniforms.amount.value = 0.03;
+                      shaderPass.renderToScreen = true;
+                      this.composer.addPass(shaderPass);
                     }}
                   />
                 </div>

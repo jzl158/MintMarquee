@@ -79,13 +79,20 @@ class SliderWave extends Component {
 
     this.dots = []
 
-    this.material = new THREE.SpriteCanvasMaterial({
-      color: 0xffffff,
-      program: context => {
-        context.beginPath()
-        context.arc(0, 0, .3, 0, PI_2, true)
-        context.fill()
-      }
+    // Modern Three.js: Create canvas texture manually (SpriteCanvasMaterial removed)
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#01693e';
+    context.beginPath();
+    context.arc(16, 16, 10, 0, PI_2, true);
+    context.fill();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    this.material = new THREE.SpriteMaterial({
+      map: texture,
+      color: 0x01693e
     })
 
     for (let i = 0; i < X_CNT; ++i) {
@@ -99,7 +106,8 @@ class SliderWave extends Component {
       }
     }
 
-    this.renderer = new THREE.CanvasRenderer({ canvas: this.canvas })
+    // Modern Three.js uses WebGLRenderer instead of CanvasRenderer
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: true })
     this.renderer.setPixelRatio(1)
     this.renderer.setSize(window.innerWidth, window.innerHeight)
 
